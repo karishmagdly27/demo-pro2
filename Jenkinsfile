@@ -117,7 +117,7 @@ def deployToServer(host) {
         sh """
             echo "Deploying to ${host}..."
 
-            TMP_DIR="/tmp/${APP_NAME}_deploy_$$"
+            TMP_DIR="/tmp/${APP_NAME}_deploy_\\$\\$"
 
             # Create temporary directory
             ssh -o StrictHostKeyChecking=no ubuntu@${host} "mkdir -p \${TMP_DIR}"
@@ -138,3 +138,4 @@ def deployToServer(host) {
         """
     }
 }
+
