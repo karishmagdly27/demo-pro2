@@ -83,7 +83,6 @@ pipeline {
             }
         }
 
-
         stage('Deploy') {
             when {
                 expression { return ['dev','stg','master'].contains(env.BRANCH_NAME) }
@@ -114,17 +113,22 @@ pipeline {
     }
 }
 
-
 def deployToServer(host) {
     sshagent(['dev-app-server']) {
         sh """
             echo "Deploying to ${host}..."
 
-            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo rm -rf /opt/demo_app/*"
-            scp -o StrictHostKeyChecking=no -r * ubuntu@${host}:/opt/demo_app/
-            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo chown -R www-data:www-data /opt/demo_app"
-            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo systemctl reload nginx"
+            # Clear Nginx default root
+            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo rm -rf /var/www/html/*"
 
+            # Copy app files to Nginx root
+            scp -o StrictHostKeyChecking=no -r * ubuntu@${host}:/var/www/html/
+
+            # Set ownership
+            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo chown -R www-data:www-data /var/www/html"
+
+            # Reload Nginx
+            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo systemctl reload nginx"
         """
     }
 }
