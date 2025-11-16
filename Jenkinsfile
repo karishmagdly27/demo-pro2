@@ -21,7 +21,7 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') { // Jenkins SonarQube server configuration
+                withSonarQubeEnv('SonarQube') { // Jenkins SonarQube server configurations
                     sh """
                         sonar-scanner \
                         -Dsonar.projectKey=${APP_NAME}-${BRANCH_NAME} \
