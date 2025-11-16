@@ -21,8 +21,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    // For multibranch pipeline, BRANCH_NAME should be automatically set
-                    def branch = env.BRANCH_NAME ?: 'dev' 
+                    def branch = env.BRANCH_NAME ?: 'dev'
                     echo "Checking out branch: ${branch}"
                     git branch: branch, url: "${APP_REPO}", credentialsId: 'git'
                 }
@@ -48,8 +47,8 @@ pipeline {
         stage('Package') {
             steps {
                 echo "Packaging application..."
-                // Package only relevant files for web deployment
-                sh "zip -r ${APP_NAME}.zip index.html css js images"
+                // Only include necessary app files
+                sh "zip -r /tmp/${APP_NAME}.zip index.html css js images || true"
             }
         }
 
@@ -62,7 +61,7 @@ pipeline {
                 nexusArtifactUploader artifacts: [[
                         artifactId: "${APP_NAME}",
                         classifier: '',
-                        file: "${APP_NAME}.zip",
+                        file: "/tmp/${APP_NAME}.zip",
                         type: 'zip'
                     ]],
                     credentialsId: 'nexus-creds',
@@ -107,15 +106,14 @@ pipeline {
 def deployToServer(host) {
     sshagent(['dev-app-server']) {
         sh """
-        echo "Deploying to ${host}..."
-        ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo rm -rf /var/www/html/*"
-        scp -o StrictHostKeyChecking=no ${APP_NAME}.zip ubuntu@${host}:/tmp/
-        ssh -o StrictHostKeyChecking=no ubuntu@${host} "
+        echo "Deploying ${APP_NAME} to ${host}..."
+        ssh -o StrictHostKeyChecking=no ubuntu@${host} '
+            sudo rm -rf /var/www/html/* &&
             sudo unzip -o /tmp/${APP_NAME}.zip -d /var/www/html &&
             sudo chown -R www-data:www-data /var/www/html &&
             sudo chmod -R 755 /var/www/html &&
             sudo systemctl reload nginx
-        "
+        '
         """
     }
 }
