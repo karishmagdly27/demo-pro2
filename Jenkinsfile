@@ -120,17 +120,11 @@ def deployToServer(host) {
         sh """
             echo "Deploying to ${host}..."
 
-            # Remove everything from nginx html folder
-            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo rm -rf /var/www/html/*"
-
-            # Copy your app files
-            scp -o StrictHostKeyChecking=no -r ./* ubuntu@${host}:/var/www/html/
-
-            # Fix permissions
-            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo chown -R www-data:www-data /var/www/html"
-
-            # Reload nginx
+            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo rm -rf /opt/demo_app/*"
+            scp -o StrictHostKeyChecking=no -r * ubuntu@${host}:/opt/demo_app/
+            ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo chown -R www-data:www-data /opt/demo_app"
             ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo systemctl reload nginx"
+
         """
     }
 }
