@@ -114,7 +114,7 @@ pipeline {
 }
 
 def deployToServer(host) {
-    sshagent(['dev-app-server']) {
+    sshagent(['app-key']) {
         sh """
             echo "Deploying to ${host}..."
 
