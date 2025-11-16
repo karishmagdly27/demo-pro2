@@ -121,7 +121,7 @@ def deployToServer(host) {
             # Clear Nginx default root
             ssh -o StrictHostKeyChecking=no ubuntu@${host} "sudo rm -rf /var/www/html/*"
 
-            # Copy app files to Nginx root
+            # Copy app file to Nginx root
             scp -o StrictHostKeyChecking=no -r * ubuntu@${host}:/var/www/html/
 
             # Set ownership
