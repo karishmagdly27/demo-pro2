@@ -1,5 +1,5 @@
 trigger:
-  - main
+  - master
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -7,9 +7,10 @@ pool:
 variables:
   imageName: 'htmlapp'
   tag: 'latest'
-  acrLogin: 'project2acr123.azurecr.io'
+  acrLogin: 'project2acr.azurecr.io'
 
 steps:
+
   # Install Podman
   - task: Bash@3
     displayName: "Install Podman"
@@ -19,7 +20,7 @@ steps:
         sudo apt-get update
         sudo apt-get install -y podman
 
-  # Build and push Podman image
+  # Build & Push Podman Image
   - task: Bash@3
     displayName: "Build and Push Image Using Podman"
     inputs:
@@ -29,7 +30,7 @@ steps:
         podman build -t $(acrLogin)/$(imageName):$(tag) .
         podman push $(acrLogin)/$(imageName):$(tag)
 
-  # Deploy to Azure Container Instance
+  # Deploy to Azure Container Instances
   - task: AzureCLI@2
     displayName: "Deploy to Azure Container Instance"
     inputs:
@@ -37,12 +38,19 @@ steps:
       scriptType: bash
       scriptLocation: inlineScript
       inlineScript: |
+        # Delete old ACI if exists
+        az container delete \
+          --resource-group project2-rg \
+          --name html-container \
+          --yes --no-wait || true
+
+        # Create new ACI with unique DNS
         az container create \
           --resource-group project2-rg \
           --name html-container \
           --image $(acrLogin)/$(imageName):$(tag) \
           --ports 80 \
-          --dns-name-label html-demo-project2 \
+          --dns-name-label html-demo-$(Build.BuildId) \
           --registry-login-server $(acrLogin) \
           --registry-username $(ACR_USERNAME) \
           --registry-password $(ACR_PASSWORD) \
