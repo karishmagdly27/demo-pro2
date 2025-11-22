@@ -7,7 +7,7 @@ pool:
 variables:
   imageName: 'htmlapp'
   tag: 'latest'
-  terraformFolder: 'terraform'
+  acrLogin: 'project2acr123.azurecr.io'
 
 steps:
   # Install Podman
@@ -17,48 +17,33 @@ steps:
       targetType: inline
       script: |
         sudo apt-get update
-        sudo apt-get install -y podman unzip curl
-
-  # Install Terraform
-  - task: Bash@3
-    displayName: "Install Terraform"
-    inputs:
-      targetType: inline
-      script: |
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-        sudo apt update && sudo apt install terraform -y
-        terraform -version
-
-  # Terraform Init & Apply
-  - task: Bash@3
-    displayName: "Terraform Apply"
-    inputs:
-      targetType: inline
-      script: |
-        cd $(terraformFolder)
-        terraform init
-        terraform apply -auto-approve
-
-  # Clone HTML repo
-  - task: Bash@3
-    displayName: "Clone HTML Repo"
-    inputs:
-      targetType: inline
-      script: |
-        git clone https://github.com/karishmagdly27/demo-pro2.git app
-        cp -r app/* .
+        sudo apt-get install -y podman
 
   # Build and push Podman image
   - task: Bash@3
-    displayName: "Build and Push Podman Image"
+    displayName: "Build and Push Image Using Podman"
     inputs:
       targetType: inline
       script: |
-        ACR_LOGIN=$(terraform output -raw acr_login_server)
-        podman login $ACR_LOGIN --username $(ACR_USERNAME) --password $(ACR_PASSWORD)
-        podman build -t $ACR_LOGIN/htmlapp:latest .
-        podman push $ACR_LOGIN/htmlapp:latest
+        podman login $(acrLogin) --username $(ACR_USERNAME) --password $(ACR_PASSWORD)
+        podman build -t $(acrLogin)/$(imageName):$(tag) .
+        podman push $(acrLogin)/$(imageName):$(tag)
 
-  # Deploy to ACI (if you want Terraform to handle this, skip this step)
-  # Optional: Use Ansible here if configuration management is required
+  # Deploy to Azure Container Instance
+  - task: AzureCLI@2
+    displayName: "Deploy to Azure Container Instance"
+    inputs:
+      azureSubscription: "azure-connection"
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        az container create \
+          --resource-group project2-rg \
+          --name html-container \
+          --image $(acrLogin)/$(imageName):$(tag) \
+          --ports 80 \
+          --dns-name-label html-demo-project2 \
+          --registry-login-server $(acrLogin) \
+          --registry-username $(ACR_USERNAME) \
+          --registry-password $(ACR_PASSWORD) \
+          --query ipAddress.fqdn
