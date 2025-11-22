@@ -54,5 +54,8 @@ steps:
           --dns-name-label html-demo-$(Build.BuildId) \
           --registry-login-server $(acrLogin) \
           --registry-username $(ACR_USERNAME) \
-          --registry-password $(ACR_PASSWORD)
+          --registry-password $(ACR_PASSWORD) \
+          --cpu 1 \
+          --memory 1
+
 
