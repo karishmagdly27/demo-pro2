@@ -34,7 +34,7 @@ steps:
   - task: AzureCLI@2
     displayName: "Deploy to Azure Container Instance"
     inputs:
-      azureSubscription: "Azure subscription 1"
+      azureSubscription: "azure-connection"
       scriptType: bash
       scriptLocation: inlineScript
       inlineScript: |
