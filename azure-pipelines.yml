@@ -42,16 +42,17 @@ steps:
         az container delete \
           --resource-group project2-rg \
           --name html-container \
-          --yes --no-wait || true
+          --yes || true
 
         # Create new ACI with unique DNS
         az container create \
           --resource-group project2-rg \
           --name html-container \
           --image $(acrLogin)/$(imageName):$(tag) \
+          --os-type Linux \
           --ports 80 \
           --dns-name-label html-demo-$(Build.BuildId) \
           --registry-login-server $(acrLogin) \
           --registry-username $(ACR_USERNAME) \
-          --registry-password $(ACR_PASSWORD) \
-          --query ipAddress.fqdn
+          --registry-password $(ACR_PASSWORD)
+
