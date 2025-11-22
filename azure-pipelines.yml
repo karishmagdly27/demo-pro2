@@ -1,0 +1,64 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  imageName: 'htmlapp'
+  tag: 'latest'
+  terraformFolder: 'terraform'
+
+steps:
+  # Install Podman
+  - task: Bash@3
+    displayName: "Install Podman"
+    inputs:
+      targetType: inline
+      script: |
+        sudo apt-get update
+        sudo apt-get install -y podman unzip curl
+
+  # Install Terraform
+  - task: Bash@3
+    displayName: "Install Terraform"
+    inputs:
+      targetType: inline
+      script: |
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+        sudo apt update && sudo apt install terraform -y
+        terraform -version
+
+  # Terraform Init & Apply
+  - task: Bash@3
+    displayName: "Terraform Apply"
+    inputs:
+      targetType: inline
+      script: |
+        cd $(terraformFolder)
+        terraform init
+        terraform apply -auto-approve
+
+  # Clone HTML repo
+  - task: Bash@3
+    displayName: "Clone HTML Repo"
+    inputs:
+      targetType: inline
+      script: |
+        git clone https://github.com/karishmagdly27/demo-pro2.git app
+        cp -r app/* .
+
+  # Build and push Podman image
+  - task: Bash@3
+    displayName: "Build and Push Podman Image"
+    inputs:
+      targetType: inline
+      script: |
+        ACR_LOGIN=$(terraform output -raw acr_login_server)
+        podman login $ACR_LOGIN --username $(ACR_USERNAME) --password $(ACR_PASSWORD)
+        podman build -t $ACR_LOGIN/htmlapp:latest .
+        podman push $ACR_LOGIN/htmlapp:latest
+
+  # Deploy to ACI (if you want Terraform to handle this, skip this step)
+  # Optional: Use Ansible here if configuration management is required
