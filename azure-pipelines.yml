@@ -1,61 +1,125 @@
 trigger:
   - master
 
-pool:
-  vmImage: 'ubuntu-latest'
-
 variables:
   imageName: 'htmlapp'
-  tag: 'latest'
+  tag: '$(Build.BuildId)'
   acrLogin: 'project2acr.azurecr.io'
 
-steps:
+stages:
 
-  # Install Podman
-  - task: Bash@3
-    displayName: "Install Podman"
-    inputs:
-      targetType: inline
-      script: |
-        sudo apt-get update
-        sudo apt-get install -y podman
+# ------------------------------- #
+# 1. Build Stage
+# ------------------------------- #
+- stage: Build
+  displayName: "Build and Push Docker Image"
+  jobs:
+    - job: Build
+      pool:
+        vmImage: 'ubuntu-latest'
 
-  # Build & Push Podman Image
-  - task: Bash@3
-    displayName: "Build and Push Image Using Podman"
-    inputs:
-      targetType: inline
-      script: |
-        podman login $(acrLogin) --username $(ACR_USERNAME) --password $(ACR_PASSWORD)
-        podman build -t $(acrLogin)/$(imageName):$(tag) .
-        podman push $(acrLogin)/$(imageName):$(tag)
+      steps:
+        - task: Bash@3
+          displayName: "Install Podman"
+          inputs:
+            targetType: inline
+            script: |
+              sudo apt-get update
+              sudo apt-get install -y podman
 
-  # Deploy to Azure Container Instances
-  - task: AzureCLI@2
-    displayName: "Deploy to Azure Container Instance"
-    inputs:
-      azureSubscription: "azure-connection"
-      scriptType: bash
-      scriptLocation: inlineScript
-      inlineScript: |
-        # Delete old ACI if exists
-        az container delete \
-          --resource-group project2-rg \
-          --name html-container \
-          --yes || true
+        - task: Bash@3
+          displayName: "Build & Push Image"
+          inputs:
+            targetType: inline
+            script: |
+              podman login $(acrLogin) --username $(ACR_USERNAME) --password $(ACR_PASSWORD)
+              podman build -t $(acrLogin)/$(imageName):$(tag) .
+              podman push $(acrLogin)/$(imageName):$(tag)
 
-        # Create new ACI with unique DNS
-        az container create \
-          --resource-group project2-rg \
-          --name html-container \
-          --image $(acrLogin)/$(imageName):$(tag) \
-          --os-type Linux \
-          --ports 80 \
-          --dns-name-label html-demo-$(Build.BuildId) \
-          --registry-login-server $(acrLogin) \
-          --registry-username $(ACR_USERNAME) \
-          --registry-password $(ACR_PASSWORD) \
-          --cpu 1 \
-          --memory 1
+        - publish: $(tag)
+          artifact: imageTag
 
 
+# ------------------------------- #
+# 2. Deploy to DEV
+# ------------------------------- #
+- stage: Deploy_Dev
+  displayName: "Deploy to DEV Environment"
+  dependsOn: Build
+
+  jobs:
+    - deployment: DeployDev
+      environment: dev
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: current
+                artifact: imageTag
+
+              - task: AzureCLI@2
+                displayName: "Deploy to ACI (Dev)"
+                inputs:
+                  azureSubscription: "azure-connection"
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    TAG=$(cat $(Pipeline.Workspace)/imageTag/imageTag)
+                    az container delete --resource-group project2-rg --name html-container --yes || true
+
+                    az container create \
+                      --resource-group project2-rg \
+                      --name html-container \
+                      --image $(acrLogin)/$(imageName):$TAG \
+                      --os-type Linux \
+                      --ports 80 \
+                      --dns-name-label html-demo-dev-$TAG \
+                      --registry-login-server $(acrLogin) \
+                      --registry-username $(ACR_USERNAME) \
+                      --registry-password $(ACR_PASSWORD) \
+                      --cpu 1 \
+                      --memory 1
+
+
+# ------------------------------- #
+# 3. Deploy to PROD (Requires Approval)
+# ------------------------------- #
+- stage: Deploy_Prod
+  displayName: "Deploy to PROD Environment"
+  dependsOn: Deploy_Dev
+
+  approval:
+    - name: "Manual Approval"
+
+  jobs:
+    - deployment: DeployProd
+      environment: prod
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: current
+                artifact: imageTag
+
+              - task: AzureCLI@2
+                displayName: "Deploy to ACI (Prod)"
+                inputs:
+                  azureSubscription: "azure-connection"
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    TAG=$(cat $(Pipeline.Workspace)/imageTag/imageTag)
+                    az container delete --resource-group project2-rg --name html-container-prod --yes || true
+
+                    az container create \
+                      --resource-group project2-rg \
+                      --name html-container-prod \
+                      --image $(acrLogin)/$(imageName):$TAG \
+                      --os-type Linux \
+                      --ports 80 \
+                      --dns-name-label html-demo-prod-$TAG \
+                      --registry-login-server $(acrLogin) \
+                      --registry-username $(ACR_USERNAME) \
+                      --registry-password $(ACR_PASSWORD) \
+                      --cpu 1 \
+                      --memory 1
