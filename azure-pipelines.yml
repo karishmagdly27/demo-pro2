@@ -12,12 +12,11 @@ stages:
 # 1. Build Stage
 # ------------------------------- #
 - stage: Build
-  displayName: "Build and Push Docker Image"
+  displayName: "Build & Push Docker Image"
   jobs:
     - job: Build
       pool:
         vmImage: 'ubuntu-latest'
-
       steps:
         - task: Bash@3
           displayName: "Install Podman"
@@ -39,14 +38,12 @@ stages:
         - publish: $(tag)
           artifact: imageTag
 
-
 # ------------------------------- #
 # 2. Deploy to DEV
 # ------------------------------- #
 - stage: Deploy_Dev
-  displayName: "Deploy to DEV Environment"
+  displayName: "Deploy to DEV"
   dependsOn: Build
-
   jobs:
     - deployment: DeployDev
       environment: dev
@@ -66,7 +63,6 @@ stages:
                   inlineScript: |
                     TAG=$(cat $(Pipeline.Workspace)/imageTag/imageTag)
                     az container delete --resource-group project2-rg --name html-container --yes || true
-
                     az container create \
                       --resource-group project2-rg \
                       --name html-container \
@@ -80,17 +76,14 @@ stages:
                       --cpu 1 \
                       --memory 1
 
-
 # ------------------------------- #
-# 3. Deploy to PROD (Requires Approval)
+# 3. Deploy to PROD (Manual Approval)
 # ------------------------------- #
 - stage: Deploy_Prod
-  displayName: "Deploy to PROD Environment"
+  displayName: "Deploy to PROD"
   dependsOn: Deploy_Dev
-
   approval:
     - name: "Manual Approval"
-
   jobs:
     - deployment: DeployProd
       environment: prod
@@ -110,7 +103,6 @@ stages:
                   inlineScript: |
                     TAG=$(cat $(Pipeline.Workspace)/imageTag/imageTag)
                     az container delete --resource-group project2-rg --name html-container-prod --yes || true
-
                     az container create \
                       --resource-group project2-rg \
                       --name html-container-prod \
