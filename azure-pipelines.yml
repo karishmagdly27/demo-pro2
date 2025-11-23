@@ -43,8 +43,16 @@ stages:
               echo "Pushing image..."
               podman push $(acrLogin)/$(imageName):$(tag)
 
-        # Publish image tag as artifact for deployment stages
-        - publish: $(tag)
+        # Save image tag to file
+        - task: Bash@3
+          displayName: "Save Image Tag to File"
+          inputs:
+            targetType: inline
+            script: |
+              echo $(tag) > imageTag.txt
+
+        # Publish the tag file as artifact
+        - publish: imageTag.txt
           artifact: imageTag
 
 # ------------------------------- #
@@ -55,7 +63,7 @@ stages:
   dependsOn: Build
   jobs:
     - deployment: DeployDev
-      environment: dev  # Manual approval is optional here
+      environment: dev  # Manual approval optional here
       strategy:
         runOnce:
           deploy:
@@ -70,8 +78,8 @@ stages:
                   scriptType: bash
                   scriptLocation: inlineScript
                   inlineScript: |
-                    # Get image tag from artifact
-                    TAG=$(cat $(Pipeline.Workspace)/imageTag/imageTag)
+                    # Read tag from artifact
+                    TAG=$(cat $(Pipeline.Workspace)/imageTag/imageTag.txt)
                     echo "Deploying image: $(acrLogin)/$(imageName):$TAG"
 
                     # Delete existing container if any
@@ -114,8 +122,8 @@ stages:
                   scriptType: bash
                   scriptLocation: inlineScript
                   inlineScript: |
-                    # Get image tag from artifact
-                    TAG=$(cat $(Pipeline.Workspace)/imageTag/imageTag)
+                    # Read tag from artifact
+                    TAG=$(cat $(Pipeline.Workspace)/imageTag/imageTag.txt)
                     echo "Deploying image: $(acrLogin)/$(imageName):$TAG"
 
                     # Delete existing PROD container if any
