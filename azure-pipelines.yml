@@ -51,7 +51,7 @@ stages:
             script: |
               echo $(tag) > imageTag.txt
 
-        # Publish the tag file as artifact
+        # Publish tag file as artifact
         - publish: imageTag.txt
           artifact: imageTag
 
